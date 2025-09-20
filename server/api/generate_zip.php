@@ -34,13 +34,13 @@ function formatCsvRow(array $rowData): array
         switch ($key) {
             case 'url':
             case 'url_sub':
-            case 'relate_notes':
-            case 'relate_video_urls':
+            case 'relate_notes': // relate_video_urlsはSQL側で処理するためここから除外
                 // 空文字やnullの場合は'NULL'文字列を、それ以外はダブルクォーテーションで囲む
                 $formattedRow[$key] = ($value === '' || $value === null || $value === 'NULL') ? 'NULL' : '"' . $value . '"';
                 break;
             case 'note':
-                // 改行コードを文字列 '\n' に変換し、ダブルクォーテーションで囲む
+            case 'relate_video_urls':
+                // noteとrelate_video_urlsは改行コードを文字列 '\n' に変換し、ダブルクォーテーションで囲む
                 $note_val = str_replace(["\r\n", "\r", "\n"], '\n', $value);
                 $formattedRow[$key] = '"' . $note_val . '"';
                 break;
@@ -62,9 +62,9 @@ if (!is_dir($tempDir)) {
 // --- ulinker_notesテーブルからのエクスポート ---
 try {
     $sql = "SELECT contents_id, title, "
-            ."CASE WHEN url = '' THEN '\"\"' ELSE url END AS url, "
-            ."url_sub, REPLACE(REPLACE(note, '\r', ''), '\n', '\\n') AS note, publicity, relate_notes, "
-            ."REPLACE(REPLACE(relate_video_urls, '\r', ''), '\n', '\\n') AS relate_video_urls, "
+            ."url, " // urlのフォーマットはPHP側で行う
+            ."url_sub, note, publicity, relate_notes, "
+            ."relate_video_urls, "
             ."created_at, updated_at, created_user_id FROM ".NOTE_TABLE;
     
     $whereClauses = ["(created_user_id = :owner_id OR publicity = 1)"];
