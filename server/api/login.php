@@ -34,7 +34,8 @@ try {
             'owner_id' => $user['owner_id'],
             'name' => $user['name'],
             'email' => $user['email'],
-            'is_teacher' => $user['is_teacher']
+            'is_teacher' => $user['is_teacher'],
+            'is_master' => $user['is_master']
         ];
         $response['success'] = true;
     } else {

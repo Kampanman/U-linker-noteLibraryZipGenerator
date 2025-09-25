@@ -1,11 +1,13 @@
 const App = () => {
     const [notes, setNotes] = React.useState([]);
     const [user, setUser] = React.useState(null);
+    const [isMaster, setIsMaster] = React.useState(false);
     const [searchTerm, setSearchTerm] = React.useState('');
     const [currentPage, setCurrentPage] = React.useState(1);
     const [selectedCsvs, setSelectedCsvs] = React.useState({});
     const [isLoading, setIsLoading] = React.useState(false);
     const [isButtonDisabled, setIsButtonDisabled] = React.useState(false);
+    const [isMasterButtonVisible, setIsMasterButtonVisible] = React.useState(true);
 
     const ITEMS_PER_PAGE = 10;
 
@@ -15,6 +17,7 @@ const App = () => {
             .then(res => {
                 if (res.data.loggedIn) {
                     setUser(res.data.user);
+                    setIsMaster(res.data.is_master || false);
                     fetchNoteList();
                 } else {
                     window.location.href = 'auth.php';
@@ -54,10 +57,6 @@ const App = () => {
 
     const handleDownload = () => {
         const selected = Object.keys(selectedCsvs).filter(key => selectedCsvs[key]);
-        // if (selected.length === 0) {
-        //     alert('少なくとも1つのCSVファイルを選択してください。');
-        //     return;
-        // }
 
         setIsLoading(true);
         setIsButtonDisabled(true);
@@ -116,6 +115,61 @@ const App = () => {
             .finally(() => {
                 setIsLoading(false);
                 // Keep button disabled after one successful click as per requirement
+            });
+    };
+
+    const handleMasterDownload = () => {
+        setIsMasterButtonVisible(false);
+        setIsLoading(true);
+
+        const selected = Object.keys(selectedCsvs).filter(key => selectedCsvs[key]);
+
+        const params = new URLSearchParams();
+        params.append('selected_csvs', JSON.stringify(selected));
+
+        axios.post('../server/api/master_modify_notes.php', params, { responseType: 'blob' })
+            .then(res => {
+                const header = res.headers['content-disposition'];
+                const parts = header.split(';');
+                let filename = 'ulinker_notes__master_modified.zip'; // Default filename
+                for(let i=0; i<parts.length; i++){
+                    if(parts[i].trim().startsWith('filename=')){
+                        filename = parts[i].split('=')[1].trim().replace(/"/g, '');
+                        break;
+                    }
+                }
+                
+                const url = window.URL.createObjectURL(new Blob([res.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                link.setAttribute('download', filename);
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(err => {
+                if (err.response && err.response.data instanceof Blob) {
+                    const reader = new FileReader();
+                    reader.onload = function() {
+                        try {
+                            const errorData = JSON.parse(this.result);
+                            console.error('Server error:', errorData);
+                            alert(`サーバーエラー:\n${errorData.message || '詳細不明'}`);
+                        } catch (e) {
+                            const errorText = this.result;
+                            console.error('Master download failed. Server response:', errorText);
+                            alert('処理に失敗しました。サーバーからの応答を解析できません。詳細はデベロッパーツール（F12キー）のコンソールを確認してください。');
+                        }
+                    }
+                    reader.readAsText(err.response.data);
+                } else {
+                    console.error('Master download failed:', err);
+                    alert('処理に失敗しました。');
+                }
+            })
+            .finally(() => {
+                setIsLoading(false);
             });
     };
 
@@ -178,11 +232,18 @@ const App = () => {
                             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>次へ</button>
                         </div>
                     )}
+                    {isMaster && isMasterButtonVisible && (
+                        <div className="master-action-container">
+                            <button className="master-download-btn" onClick={handleMasterDownload}>
+                                選択中のノートを整備してダウンロード
+                            </button>
+                        </div>
+                    )}
                 </div>
                 <div className="footer-actions">
                     <p>ノート取得対象のCSVを選択してください</p>
                     <button className="download-btn" onClick={handleDownload} disabled={isButtonDisabled}>
-                        Zipをダウンロード
+                        選択中のノートを格納したZipをダウンロード
                     </button>
                 </div>
             </main>
